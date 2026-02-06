@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -49,23 +50,26 @@ footer { visibility: hidden; }
 # ==============================
 # LOAD ARTIFACTS
 # ==============================
+
 @st.cache_resource
 def load_artifacts():
-    model = load_model(r"C:\Users\avika\OneDrive\Documents\nids app\nids_model.h5")
+    BASE_DIR = os.path.dirname(__file__)
 
-    with open(r"C:\Users\avika\OneDrive\Documents\nids app\scaler.pkl", "rb") as f:
+    model = load_model(os.path.join(BASE_DIR, "nids_model.h5"))
+
+    with open(os.path.join(BASE_DIR, "scaler.pkl"), "rb") as f:
         scaler = pickle.load(f)
 
-    with open(r"C:\Users\avika\OneDrive\Documents\nids app\encoders.pkl", "rb") as f:
+    with open(os.path.join(BASE_DIR, "encoders.pkl"), "rb") as f:
         encoders = pickle.load(f)
 
-    with open(r"C:\Users\avika\OneDrive\Documents\nids app\features.pkl", "rb") as f:
+    with open(os.path.join(BASE_DIR, "features.pkl"), "rb") as f:
         features = pickle.load(f)
 
     return model, scaler, encoders, features
 
-model, scaler, encoders, features = load_artifacts()
 
+model, scaler, encoders, features = load_artifacts()
 # ==============================
 # NAVIGATION
 # ==============================
@@ -258,4 +262,5 @@ elif menu == "Batch Analysis":
 
     st.markdown("### 📋 Classification Report")
     st.dataframe(report_df)
+
     st.markdown(f"**Accuracy:** {acc:.3f}")
