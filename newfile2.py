@@ -1,19 +1,15 @@
-import os
-import streamlit as st
-import pandas as pd
-import numpy as np
-import pickle
-from tensorflow.keras.models import load_model
+from tensorflow.keras.models import load_model, Sequential
+from tensorflow.keras.layers import Dense
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
-from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
-from sklearn.preprocessing import LabelEncoder
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 import numpy as np
+import os
+import pickle
+
 # ==============================
 # PAGE CONFIG
 # ==============================
@@ -48,9 +44,8 @@ footer { visibility: hidden; }
 """, unsafe_allow_html=True)
 
 # ==============================
-# LOAD ARTIFACTS
+# LOAD ARTIFACTS (UNCHANGED)
 # ==============================
-
 @st.cache_resource
 def load_artifacts():
     BASE_DIR = os.path.dirname(__file__)
@@ -70,10 +65,20 @@ def load_artifacts():
 
 
 model, scaler, encoders, features = load_artifacts()
+
 # ==============================
-# NAVIGATION
+# NAVIGATION (UPDATED)
 # ==============================
-menu = st.radio("", ["Home", "Analyze", "Batch Analysis"], horizontal=True)
+if "menu" not in st.session_state:
+    st.session_state.menu = "Home"
+
+menu = st.radio(
+    "", ["Home", "Analyze", "Batch Analysis"],
+    index=["Home", "Analyze", "Batch Analysis"].index(st.session_state.menu),
+    horizontal=True
+)
+
+st.session_state.menu = menu
 
 # ==============================
 # HOME
@@ -89,8 +94,20 @@ if menu == "Home":
         unsafe_allow_html=True
     )
 
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button("🔍 Analyze Single Input"):
+            st.session_state.menu = "Analyze"
+
+    with col2:
+        if st.button("📊 Batch Analysis"):
+            st.session_state.menu = "Batch Analysis"
+
 # ==============================
-# ANALYZE (SINGLE INPUT)
+# ANALYZE (UNCHANGED)
 # ==============================
 elif menu == "Analyze":
     st.markdown("<h2 style='text-align:center;'>Analyze Network Traffic</h2>", unsafe_allow_html=True)
@@ -141,8 +158,9 @@ elif menu == "Analyze":
 
         st.metric("Attack Probability", f"{pred:.4f}")
         st.success(f"Prediction: **{label}**")
+
 # ==============================
-# BATCH ANALYSIS
+# BATCH ANALYSIS (ANN ADDED)
 # ==============================
 elif menu == "Batch Analysis":
     st.markdown(
@@ -150,118 +168,63 @@ elif menu == "Batch Analysis":
         unsafe_allow_html=True
     )
 
-    # --- File upload ---
     uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
     if uploaded_file is None:
-        st.info("👆 Upload a CSV file to get started.")
         st.stop()
 
-    # --- Load data ---
-    try:
-        df = pd.read_csv(uploaded_file, encoding="ISO-8859-1")
-    except Exception as e:
-        st.error(f"Failed to read CSV: {e}")
-        st.stop()
+    df = pd.read_csv(uploaded_file, encoding="ISO-8859-1")
 
-    st.subheader("🔎 Data Overview")
     st.dataframe(df.head())
 
-    st.subheader("📈 Data Statistics")
-    st.dataframe(df.describe(include="all").T)
-
-    # -------------------------
-    # FILTERING
-    # -------------------------
-    st.subheader("🧪 Filter Data")
-    columns = df.columns.tolist()
-    filter_col = st.selectbox("Select column to filter", columns)
-    filter_val = st.selectbox(
-        f"Select value from `{filter_col}`",
-        df[filter_col].dropna().unique()
-    )
-
-    filtered_df = df[df[filter_col] == filter_val].copy()
-    st.dataframe(filtered_df)
-
-    # -------------------------
-    # PLOTTING
-    # -------------------------
-    st.subheader("📊 Plot Data Overview")
-    numeric_cols = df.select_dtypes(include=["number"]).columns.tolist()
-
-    if len(numeric_cols) >= 2:
-        x_col = st.selectbox("Select X-axis column", numeric_cols)
-        y_col = st.selectbox("Select Y-axis column", numeric_cols)
-        plot_type = st.radio("Plot type", ["Line", "Pie"], horizontal=True)
-
-        if st.button("Plot Data"):
-            plot_df = df[[x_col, y_col]].dropna()
-
-            if plot_type == "Line":
-                st.line_chart(plot_df.set_index(x_col))
-            else:
-                agg = plot_df.groupby(x_col)[y_col].sum()
-                fig, ax = plt.subplots(figsize=(4, 4))
-                ax.pie(agg, labels=agg.index, autopct="%1.1f%%")
-                ax.set_title(f"{y_col} distribution over {x_col}")
-                st.pyplot(fig)
-    else:
-        st.warning("Need at least two numeric columns for plotting.")
-
-    # -------------------------
-    # CLASSIFICATION
-    # -------------------------
-    st.subheader("🤖 Classification: Train & Evaluate")
+    # Classification
+    st.subheader("🤖 ANN Classification")
 
     all_columns = df.columns.tolist()
     target_col = st.selectbox("Select target column", all_columns)
+
     feature_cols = st.multiselect(
         "Select feature columns",
-        [c for c in all_columns if c != target_col],
-        default=[c for c in numeric_cols if c != target_col][:2]
+        [c for c in all_columns if c != target_col]
     )
-
-    if not feature_cols:
-        st.warning("Please select at least one feature column.")
-        st.stop()
 
     model_df = df[[target_col] + feature_cols].dropna().copy()
 
-    # Encode categorical columns safely
-    clf_encoders = {}
-    for col in [target_col] + feature_cols:
-        if model_df[col].dtype == object or not pd.api.types.is_numeric_dtype(model_df[col]):
+    # Encoding
+    for col in model_df.columns:
+        if model_df[col].dtype == object:
             le = LabelEncoder()
             model_df[col] = le.fit_transform(model_df[col].astype(str))
-            clf_encoders[col] = le
 
     X = model_df[feature_cols]
     y = model_df[target_col]
 
-    test_size = st.slider("Test set proportion", 0.1, 0.5, 0.2)
-    stratify = y if y.nunique() > 1 else None
-
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=test_size, random_state=42, stratify=stratify
+        X, y, test_size=0.2, random_state=42
     )
 
-    pipeline = make_pipeline(
-        StandardScaler(),
-        DecisionTreeClassifier(random_state=42)
+    scaler_ann = StandardScaler()
+    X_train = scaler_ann.fit_transform(X_train)
+    X_test = scaler_ann.transform(X_test)
+
+    # ANN MODEL
+    ann_model = Sequential([
+        Dense(64, activation='relu', input_shape=(X_train.shape[1],)),
+        Dense(32, activation='relu'),
+        Dense(1, activation='sigmoid')
+    ])
+
+    ann_model.compile(
+        optimizer='adam',
+        loss='binary_crossentropy',
+        metrics=['accuracy']
     )
 
-    pipeline.fit(X_train, y_train)
-    y_pred = pipeline.predict(X_test)
+    ann_model.fit(X_train, y_train, epochs=10, batch_size=32, verbose=0)
+
+    y_pred = (ann_model.predict(X_test) > 0.5).astype(int)
 
     acc = accuracy_score(y_test, y_pred)
-    report_df = pd.DataFrame(
-        classification_report(y_test, y_pred, output_dict=True)
-    ).transpose()
 
-    cm = confusion_matrix(y_test, y_pred)
-
-    st.markdown("### 📋 Classification Report")
-    st.dataframe(report_df)
-
-    st.markdown(f"**Accuracy:** {acc:.3f}")
+    st.write("Accuracy:", acc)
+    st.dataframe(pd.DataFrame(classification_report(y_test, y_pred, output_dict=True)).transpose()))
 
