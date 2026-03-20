@@ -358,5 +358,5 @@ elif menu == "Batch Analysis":
 
 
     st.write("Accuracy:", acc)
-    st.dataframe(pd.DataFrame(classification_report(y_test, y_pred, output_dict=True)).transpose()))
+    st.dataframe(pd.DataFrame(classification_report(y_test, y_pred, output_dict=True)).transpose())
 
