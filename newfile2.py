@@ -110,12 +110,12 @@ if menu == "Home":
         btn_col1, btn_col2 = st.columns(2)
 
         with btn_col1:
-            if st.button("🔍 Go to Analyze", use_container_width=True):
+            if st.button(" Go to Analyze", use_container_width=True):
                 st.session_state.menu = "Analyze"
                 st.rerun()
 
         with btn_col2:
-            if st.button("📂 Go to Batch Analysis", use_container_width=True):
+            if st.button(" Go to Batch Analysis", use_container_width=True):
                 st.session_state.menu = "Batch Analysis"
                 st.rerun()
     # ────────────────────────────────────────────────────────────────────────
@@ -139,7 +139,7 @@ elif menu == "Analyze":
         count = st.number_input("Connection Count", min_value=0, value=10)
         srv_count = st.number_input("Service Count", min_value=0, value=10)
 
-    if st.button("🚀 Analyze"):
+    if st.button(" Analyze"):
         row = dict.fromkeys(features, 0)
 
         row["protocol_type"] = encoders["protocol_type"].transform([protocol])[0]
@@ -185,7 +185,7 @@ elif menu == "Batch Analysis":
     # --- File upload ---
     uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
     if uploaded_file is None:
-        st.info("👆 Upload a CSV file to get started.")
+        st.info("Upload a CSV file to get started.")
         st.stop()
 
     # --- Load data ---
